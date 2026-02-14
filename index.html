@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>SWADE — Old West — Character Builder</title>
+<style>
+body{font-family:Georgia,serif;margin:0;background:#f4f4f4}
+.container{max-width:1100px;margin:20px auto;background:#fff;padding:20px;border:1px solid #ccc}
+h1{margin-top:0}
+section{margin-bottom:20px;padding:10px;border:1px solid #ccc}
+label{display:block;font-size:13px;margin-top:6px}
+input,select,textarea{width:100%;padding:6px;margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border:1px solid #ccc;padding:6px}
+.small{width:100px}
+.status{padding:10px;font-weight:bold}
+.ok{color:green}
+.bad{color:red}
+@media print{
+  button{display:none}
+  body{background:#fff}
+  .container{border:none}
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>SWADE — Old West Character Builder</h1>
+
+<section>
+<h2>Character</h2>
+<label>Name <input id="name"></label>
+<label>Concept <input id="concept"></label>
+<label>Race
+<select id="race">
+<option value="Human">Human (Adaptable: 1 free Novice Edge)</option>
+</select>
+</label>
+<label>Advances <input type="number" id="advances" value="0" min="0"></label>
+<p>Rank: <span id="rank">Novice</span></p>
+</section>
+
+<section>
+<h2>Attributes</h2>
+<table>
+<tr><th>Attribute</th><th>Die</th></tr>
+<tr><td>Agility</td><td><select class="attr"><option>d4</option><option>d6</option><option>d8</option><option>d10</option><option>d12</option></select></td></tr>
+<tr><td>Smarts</td><td><select class="attr"><option>d4</option><option>d6</option><option>d8</option><option>d10</option><option>d12</option></select></td></tr>
+<tr><td>Spirit</td><td><select class="attr"><option>d4</option><option>d6</option><option>d8</option><option>d10</option><option>d12</option></select></td></tr>
+<tr><td>Strength</td><td><select class="attr"><option>d4</option><option>d6</option><option>d8</option><option>d10</option><option>d12</option></select></td></tr>
+<tr><td>Vigor</td><td><select class="attr"><option>d4</option><option>d6</option><option>d8</option><option>d10</option><option>d12</option></select></td></tr>
+</table>
+</section>
+
+<section>
+<h2>Hindrances</h2>
+<table>
+<tr><th>Name</th><th>Severity</th></tr>
+<tr>
+<td>
+<select class="hind">
+<option value="">--</option>
+<option value="Minor">Minor Hindrance</option>
+<option value="Major">Major Hindrance</option>
+</select>
+</td>
+<td>
+<select class="sev">
+<option value="1">Minor (1)</option>
+<option value="2">Major (2)</option>
+</select>
+</td>
+</tr>
+</table>
+<p>Hindrance Points: <span id="hindPoints">0</span>/4</p>
+</section>
+
+<section>
+<h2>Edges</h2>
+<table>
+<tr><th>Source</th><th>Name</th></tr>
+<tr>
+<td>Race</td>
+<td><input placeholder="Free Novice Edge"></td>
+</tr>
+<tr>
+<td>Hindrance</td>
+<td><input></td>
+</tr>
+<tr>
+<td>Advance</td>
+<td><input></td>
+</tr>
+</table>
+</section>
+
+<section>
+<h2>Status</h2>
+<div id="status" class="status ok">OK</div>
+<button onclick="window.print()">Print</button>
+</section>
+
+</div>
+
+<script>
+const advInput=document.getElementById("advances");
+const rankSpan=document.getElementById("rank");
+
+function updateRank(){
+let adv=parseInt(advInput.value)||0;
+let rank="Novice";
+if(adv>=4)rank="Seasoned";
+if(adv>=8)rank="Veteran";
+if(adv>=12)rank="Heroic";
+if(adv>=16)rank="Legendary";
+rankSpan.textContent=rank;
+}
+advInput.addEventListener("input",updateRank);
+updateRank();
+</script>
+
+</body>
+</html>
