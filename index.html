@@ -28,7 +28,8 @@
   button{appearance:none;border:1px solid #999;background:#fff;padding:8px 10px;border-radius:8px;font-family:inherit;font-size:12px;cursor:pointer}
   button:hover{background:#f7f7f7}
   .hint{font-size:12px;color:#444;line-height:1.35}
-  textarea.small{min-height:100px}
+  textarea.small{min-height:110px}
+  .errbox{border:1px solid #b00020;background:#fff3f5;padding:10px;margin:10px 0;color:#b00020;display:none}
   @media print{
     button{display:none}
     body{background:#fff}
@@ -41,6 +42,8 @@
 <div class="container">
 
 <h1>SWADE — Old West Character Builder</h1>
+
+<div id="runtimeError" class="errbox"></div>
 
 <section>
   <h2>Character</h2>
@@ -65,7 +68,6 @@
     </div>
     <div class="muted" style="font-size:13px;line-height:1.35">
       Stage B adds Hindrance point accounting and legal spending that feeds attribute/skill budgets.
-      Edges and advancement legality come later.
     </div>
   </div>
 </section>
@@ -126,6 +128,7 @@
     <span class="pill">Spent: <span id="hindSpent" class="mono">0</span></span>
     <span class="pill">Remaining: <span id="hindRemain" class="mono">0</span></span>
     <span class="pill">Status: <span id="hindStatus" class="mono ok">OK</span></span>
+    <span class="pill">Loaded hindrances: <span id="hindCount" class="mono">0</span></span>
   </div>
 
   <h3 style="margin:14px 0 8px;font-size:14px;">Spend Hindrance Points</h3>
@@ -152,31 +155,26 @@
       <label>+2× Starting Funds (cost 1)
         <input id="buyFunds" type="number" value="0" min="0" max="4">
       </label>
-      <div class="hint">Tracked later (Stage C/D). Counted for legality now.</div>
+      <div class="hint">Counted for legality now.</div>
     </div>
-  </div>
-
-  <div class="muted" style="margin-top:10px">
-    This stage enforces point legality and updates budgets. It does not auto-apply mechanical effects (pace penalties, bennies, etc.).
   </div>
 </section>
 
 <section>
-  <h2>Hindrance List Loader (optional)</h2>
+  <h2>Hindrance List Loader</h2>
   <div class="hint">
-    If you want the <b>full</b> hindrance list, paste lines in the format:<br/>
+    Paste lines in the format:<br/>
     <span class="mono">Name | Minor</span> or <span class="mono">Name | Major</span> or <span class="mono">Name | Minor/Major</span><br/>
-    Optionally add a third field for a short summary:<br/>
-    <span class="mono">Name | Minor/Major | your summary</span><br/><br/>
-    Click “Load Hindrance List”. The list is saved in your browser (localStorage).
+    Optional 3rd field summary:<br/>
+    <span class="mono">Name | Minor/Major | summary</span><br/><br/>
+    Click “Load Hindrance List”. Stored in your browser (localStorage).
   </div>
   <label>Paste Hindrances Here
-    <textarea id="hindImport" class="small" placeholder="All Thumbs | Minor | -2 to use devices&#10;Wanted | Minor/Major | Sought by authorities..."></textarea>
+    <textarea id="hindImport" class="small" placeholder="All Thumbs | Minor | penalties using devices&#10;Wanted | Minor/Major | sought by authorities"></textarea>
   </label>
   <div class="kpis">
     <button id="btnLoadHinds" type="button">Load Hindrance List</button>
     <button id="btnResetHinds" type="button">Reset to Starter List</button>
-    <span class="pill">Currently loaded: <span id="hindCount" class="mono">0</span></span>
   </div>
 </section>
 
@@ -189,407 +187,384 @@
 </div>
 
 <script>
-/* ====== Dice + costs ====== */
-const DICE = ["d4","d6","d8","d10","d12"];
-const DICE_IDX = {"d4":0,"d6":1,"d8":2,"d10":3,"d12":4};
+(() => {
+  try {
+    /* ====== Dice + costs ====== */
+    const DICE = ["d4","d6","d8","d10","d12"];
+    const DICE_IDX = {"d4":0,"d6":1,"d8":2,"d10":3,"d12":4};
+    const ATTRS = ["Agility","Smarts","Spirit","Strength","Vigor"];
 
-function dieCostFromD4(d){ return DICE_IDX[d] ?? 0; } // d4=0,d6=1,d8=2,d10=3,d12=4
+    const SKILLS = [
+      {name:"Academics", linked:"Smarts"},
+      {name:"Athletics", linked:"Agility", core:true},
+      {name:"Battle", linked:"Smarts"},
+      {name:"Boating", linked:"Agility"},
+      {name:"Driving", linked:"Agility"},
+      {name:"Faith", linked:"Spirit"},
+      {name:"Fighting", linked:"Agility"},
+      {name:"Gambling", linked:"Smarts"},
+      {name:"Healing", linked:"Smarts"},
+      {name:"Intimidation", linked:"Spirit"},
+      {name:"Language", linked:"Smarts"},
+      {name:"Notice", linked:"Smarts", core:true},
+      {name:"Occult", linked:"Smarts"},
+      {name:"Performance", linked:"Spirit"},
+      {name:"Persuasion", linked:"Spirit", core:true},
+      {name:"Repair", linked:"Smarts"},
+      {name:"Research", linked:"Smarts"},
+      {name:"Riding", linked:"Agility", core:true},
+      {name:"Science", linked:"Smarts"},
+      {name:"Shooting", linked:"Agility"},
+      {name:"Stealth", linked:"Agility", core:true},
+      {name:"Survival", linked:"Smarts"},
+      {name:"Taunt", linked:"Smarts"},
+      {name:"Thievery", linked:"Agility"}
+    ];
 
-/* ====== Attributes ====== */
-const ATTRS = ["Agility","Smarts","Spirit","Strength","Vigor"];
+    const STARTER_HINDRANCES = [
+      {name:"All Thumbs", type:"Minor", summary:"Clumsy with devices; penalties apply."},
+      {name:"Arrogant", type:"Minor", summary:"Overconfident; may create trouble."},
+      {name:"Bad Eyes", type:"Minor/Major", summary:"Impaired vision; severity varies."},
+      {name:"Bloodthirsty", type:"Major", summary:"Prefers lethal solutions; complications likely."},
+      {name:"Cautious", type:"Minor", summary:"Hesitates; avoids risk."},
+      {name:"Curious", type:"Major", summary:"Compelled to investigate."},
+      {name:"Enemy", type:"Minor/Major", summary:"Has an enemy; severity varies."},
+      {name:"Greedy", type:"Minor/Major", summary:"Desires wealth; severity varies."},
+      {name:"Habit", type:"Minor/Major", summary:"Addictive habit; severity varies."},
+      {name:"Illiterate", type:"Minor", summary:"Cannot read."},
+      {name:"Loyal", type:"Minor", summary:"Sticks by allies/cause."},
+      {name:"Mean", type:"Minor", summary:"Antagonistic; worsens social interactions."},
+      {name:"Pacifist", type:"Minor/Major", summary:"Avoids violence; severity varies."},
+      {name:"Phobia", type:"Minor/Major", summary:"Fear trigger; severity varies."},
+      {name:"Stubborn", type:"Minor", summary:"Digs in; resists compromise."},
+      {name:"Vow", type:"Minor/Major", summary:"Binding vow; severity varies."},
+      {name:"Wanted", type:"Minor/Major", summary:"Sought by law or others; severity varies."}
+    ];
 
-/* ====== Skills (Common Knowledge removed) ====== */
-const SKILLS = [
-  {name:"Academics", linked:"Smarts"},
-  {name:"Athletics", linked:"Agility", core:true},
-  {name:"Battle", linked:"Smarts"},
-  {name:"Boating", linked:"Agility"},
-  {name:"Driving", linked:"Agility"},
-  {name:"Faith", linked:"Spirit"},
-  {name:"Fighting", linked:"Agility"},
-  {name:"Gambling", linked:"Smarts"},
-  {name:"Healing", linked:"Smarts"},
-  {name:"Intimidation", linked:"Spirit"},
-  {name:"Language", linked:"Smarts"},
-  {name:"Notice", linked:"Smarts", core:true},
-  {name:"Occult", linked:"Smarts"},
-  {name:"Performance", linked:"Spirit"},
-  {name:"Persuasion", linked:"Spirit", core:true},
-  {name:"Repair", linked:"Smarts"},
-  {name:"Research", linked:"Smarts"},
-  {name:"Riding", linked:"Agility", core:true},
-  {name:"Science", linked:"Smarts"},
-  {name:"Shooting", linked:"Agility"},
-  {name:"Stealth", linked:"Agility", core:true},
-  {name:"Survival", linked:"Smarts"},
-  {name:"Taunt", linked:"Smarts"},
-  {name:"Thievery", linked:"Agility"}
-];
+    const LS_KEY_HINDS = "swade_oldwest_hindrances_v1";
 
-function rankFromAdv(adv){
-  if(adv>=16) return "Legendary";
-  if(adv>=12) return "Heroic";
-  if(adv>=8) return "Veteran";
-  if(adv>=4) return "Seasoned";
-  return "Novice";
-}
+    function dieCostFromD4(d){ return DICE_IDX[d] ?? 0; }
+    function rankFromAdv(adv){
+      if(adv>=16) return "Legendary";
+      if(adv>=12) return "Heroic";
+      if(adv>=8) return "Veteran";
+      if(adv>=4) return "Seasoned";
+      return "Novice";
+    }
 
-/* Skill cost rule:
-   - Core skills begin at d4 for free.
-   - Non-core skills begin untrained (blank) for free; d4 is first paid step.
-   - Each step up to and including linked attribute costs 1.
-   - Each step above linked costs 2.
-*/
-function skillCost(skillDie, linkedDie, isCore){
-  if(!skillDie) return 0;
-  const sIdx = DICE_IDX[skillDie];
-  const lIdx = DICE_IDX[linkedDie] ?? 0;
-  const basePaidIdx = isCore ? 0 : -1;
-  let cost = 0;
-  for(let idx = basePaidIdx + 1; idx <= sIdx; idx++){
-    if(isCore && idx===0) continue; // d4 free for core
-    cost += (idx <= lIdx) ? 1 : 2;
-  }
-  return cost;
-}
-
-/* ====== Hindrances ======
-   Starter list only. Use Loader to paste your full list once.
-*/
-const STARTER_HINDRANCES = [
-  {name:"All Thumbs", type:"Minor", summary:"Clumsy with devices; penalties apply."},
-  {name:"Anemic", type:"Minor", summary:"Weaker constitution in fatigue-type resistance."},
-  {name:"Arrogant", type:"Minor", summary:"Overconfident; may take unnecessary risks."},
-  {name:"Bad Eyes", type:"Minor/Major", summary:"Impaired vision; severity varies."},
-  {name:"Bad Luck", type:"Major", summary:"Fewer resources/luck in play (handled later if automated)."},
-  {name:"Bloodthirsty", type:"Major", summary:"Prefers lethal solutions; may cause trouble."},
-  {name:"Cautious", type:"Minor", summary:"Hesitates; avoids risk."},
-  {name:"Clueless", type:"Major", summary:"Out of touch; frequently surprised by norms."},
-  {name:"Curious", type:"Major", summary:"Compelled to investigate."},
-  {name:"Elderly", type:"Major", summary:"Aging penalties; exact mechanical effects not automated here."},
-  {name:"Enemy", type:"Minor/Major", summary:"Has an enemy; severity varies."},
-  {name:"Greedy", type:"Minor/Major", summary:"Desires wealth; severity varies."},
-  {name:"Habit", type:"Minor/Major", summary:"Addictive habit; severity varies."},
-  {name:"Illiterate", type:"Minor", summary:"Cannot read; social/skill impacts."},
-  {name:"Loyal", type:"Minor", summary:"Sticks by allies/cause."},
-  {name:"Mean", type:"Minor", summary:"Antagonistic; worsens social interactions."},
-  {name:"Pacifist", type:"Minor/Major", summary:"Avoids violence; severity varies."},
-  {name:"Phobia", type:"Minor/Major", summary:"Fear trigger; severity varies."},
-  {name:"Stubborn", type:"Minor", summary:"Digs in; resists compromise."},
-  {name:"Vow", type:"Minor/Major", summary:"Binding vow; severity varies."},
-  {name:"Wanted", type:"Minor/Major", summary:"Sought by law or others; severity varies."}
-];
-
-const LS_KEY_HINDS = "swade_oldwest_hindrances_v1";
-
-/* ====== UI Builders ====== */
-function buildAttrTable(){
-  const tb = document.querySelector("#attrTable tbody");
-  tb.innerHTML = "";
-  for(const a of ATTRS){
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td><b>${a}</b></td>
-      <td>
-        <select class="attrSel" data-attr="${a}">
-          ${DICE.map(d=>`<option value="${d}">${d}</option>`).join("")}
-        </select>
-      </td>
-      <td class="mono" id="attrCost_${a}">0</td>
-    `;
-    tb.appendChild(tr);
-    tr.querySelector("select").value = "d4";
-  }
-}
-
-function buildSkillTable(){
-  const tb = document.querySelector("#skillTable tbody");
-  tb.innerHTML = "";
-  for(const s of SKILLS){
-    const tr = document.createElement("tr");
-    const opts = [`<option value=""></option>`].concat(DICE.map(d=>`<option value="${d}">${d}</option>`)).join("");
-    tr.innerHTML = `
-      <td>${s.core ? "◇ " : ""}${s.name}</td>
-      <td class="mono">${s.linked}</td>
-      <td>
-        <select class="skillSel" data-skill="${s.name}">
-          ${opts}
-        </select>
-      </td>
-      <td class="mono" id="skillCost_${s.name}">0</td>
-      <td class="muted">${s.core ? "Core: starts at d4 free" : ""}</td>
-    `;
-    tb.appendChild(tr);
-    tr.querySelector("select").value = s.core ? "d4" : "";
-  }
-}
-
-function buildHindTable(hinds){
-  const tb = document.querySelector("#hindTable tbody");
-  tb.innerHTML = "";
-  for(let i=0;i<3;i++){
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>
-        <select class="hindSel" data-hrow="${i}">
-          <option value=""></option>
-          ${hinds.map(h=>`<option value="${escapeHtml(h.name)}">${escapeHtml(h.name)}</option>`).join("")}
-        </select>
-      </td>
-      <td class="mono" id="hindType_${i}">—</td>
-      <td id="hindSum_${i}">—</td>
-      <td class="center mono" id="hindPts_${i}">0</td>
-    `;
-    tb.appendChild(tr);
-  }
-}
-
-function escapeHtml(s){
-  return (s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
-}
-
-/* ====== Hindrance list state ====== */
-let hindList = [];
-
-function loadHindList(){
-  const raw = localStorage.getItem(LS_KEY_HINDS);
-  if(raw){
-    try{
-      const parsed = JSON.parse(raw);
-      if(Array.isArray(parsed) && parsed.length){
-        hindList = parsed;
-        return;
+    function skillCost(skillDie, linkedDie, isCore){
+      if(!skillDie) return 0;
+      const sIdx = DICE_IDX[skillDie];
+      const lIdx = DICE_IDX[linkedDie] ?? 0;
+      const basePaidIdx = isCore ? 0 : -1;
+      let cost = 0;
+      for(let idx = basePaidIdx + 1; idx <= sIdx; idx++){
+        if(isCore && idx===0) continue;
+        cost += (idx <= lIdx) ? 1 : 2;
       }
-    }catch{}
-  }
-  hindList = STARTER_HINDRANCES.slice();
-}
-
-function saveHindList(){
-  localStorage.setItem(LS_KEY_HINDS, JSON.stringify(hindList));
-}
-
-function hindByName(name){
-  return hindList.find(h=>h.name===name) || null;
-}
-
-/* ====== Compute ====== */
-function getAttrDie(attr){
-  const sel = document.querySelector(`.attrSel[data-attr="${attr}"]`);
-  return sel ? sel.value : "d4";
-}
-
-function computeRank(){
-  const adv = parseInt(document.getElementById("advances").value || "0", 10) || 0;
-  document.getElementById("rank").textContent = rankFromAdv(adv);
-}
-
-function computeHindrances(){
-  let pts = 0;
-  for(let i=0;i<3;i++){
-    const sel = document.querySelector(`.hindSel[data-hrow="${i}"]`);
-    const name = sel ? sel.value : "";
-    const def = name ? hindByName(name) : null;
-
-    const typeEl = document.getElementById(`hindType_${i}`);
-    const sumEl  = document.getElementById(`hindSum_${i}`);
-    const ptsEl  = document.getElementById(`hindPts_${i}`);
-
-    if(!def){
-      typeEl.textContent = "—";
-      sumEl.textContent  = "—";
-      ptsEl.textContent  = "0";
-      continue;
+      return cost;
     }
 
-    typeEl.textContent = def.type || "—";
-    sumEl.textContent  = def.summary || "";
-    const p = (def.type==="Minor") ? 1 : (def.type==="Major") ? 2 : 0;
-    // Minor/Major requires you to choose: here we treat selection as 1 by default and let you override via suffix.
-    // If you want explicit minor/major pick per row, we can add it in 2 minutes.
-    const pEff = (def.type==="Minor/Major") ? inferMinorMajorPoints(name) : p;
-
-    ptsEl.textContent = String(pEff);
-    pts += pEff;
-  }
-
-  document.getElementById("hindPts").textContent = String(pts);
-
-  const spend = hindSpend();
-  document.getElementById("hindSpent").textContent = String(spend.total);
-  document.getElementById("hindRemain").textContent = String(pts - spend.total);
-
-  let ok = true;
-  if(pts > 4) ok = false;
-  if(spend.total > pts) ok = false;
-
-  const statusEl = document.getElementById("hindStatus");
-  statusEl.textContent = ok ? "OK" : "ILLEGAL";
-  statusEl.className = "mono " + (ok ? "ok" : "bad");
-
-  document.getElementById("hindCount").textContent = String(hindList.length);
-
-  return {pts, ok, spend};
-}
-
-// Allow user to disambiguate Minor/Major by typing suffix in the dropdown-selected name:
-// e.g., "Wanted (Major)" or "Wanted (Minor)".
-function inferMinorMajorPoints(name){
-  const n = (name||"").toLowerCase();
-  if(n.includes("(major)")) return 2;
-  if(n.includes("(minor)")) return 1;
-  // default: Minor
-  return 1;
-}
-
-function hindSpend(){
-  const buyAttr  = clampInt(document.getElementById("buyAttr").value,0,99);
-  const buySkill = clampInt(document.getElementById("buySkill").value,0,99);
-  const buyEdge  = clampInt(document.getElementById("buyEdge").value,0,99);
-  const buyFunds = clampInt(document.getElementById("buyFunds").value,0,99);
-  const total = (2*buyAttr) + (1*buySkill) + (2*buyEdge) + (1*buyFunds);
-  return {buyAttr,buySkill,buyEdge,buyFunds,total};
-}
-
-function clampInt(v, lo, hi){
-  let n = parseInt(v||"0",10); if(Number.isNaN(n)) n=0;
-  return Math.max(lo, Math.min(hi, n));
-}
-
-function computeAttributes(attrBudget){
-  let spent = 0;
-  for(const a of ATTRS){
-    const die = getAttrDie(a);
-    const c = dieCostFromD4(die);
-    spent += c;
-    const cell = document.getElementById(`attrCost_${a}`);
-    if(cell) cell.textContent = String(c);
-  }
-  document.getElementById("attrSpent").textContent = String(spent);
-  document.getElementById("attrBudget").textContent = String(attrBudget);
-
-  const ok = spent <= attrBudget;
-  const st = document.getElementById("attrStatus");
-  st.textContent = ok ? "OK" : "ILLEGAL";
-  st.className = "mono " + (ok ? "ok" : "bad");
-  return {spent, budget:attrBudget, ok};
-}
-
-function computeSkills(skillBudget){
-  let spent = 0;
-  for(const s of SKILLS){
-    const sel = document.querySelector(`.skillSel[data-skill="${s.name}"]`);
-    const skillDie = sel ? sel.value : "";
-    const linkedDie = getAttrDie(s.linked);
-    const cost = skillCost(skillDie, linkedDie, !!s.core);
-    spent += cost;
-    const cell = document.getElementById(`skillCost_${s.name}`);
-    if(cell) cell.textContent = String(cost);
-  }
-  document.getElementById("skillSpent").textContent = String(spent);
-  document.getElementById("skillBudget").textContent = String(skillBudget);
-
-  const ok = spent <= skillBudget;
-  const st = document.getElementById("skillStatus");
-  st.textContent = ok ? "OK" : "ILLEGAL";
-  st.className = "mono " + (ok ? "ok" : "bad");
-  return {spent, budget:skillBudget, ok};
-}
-
-function computeAll(){
-  computeRank();
-  const h = computeHindrances();
-
-  const baseAttrBudget = 5;
-  const baseSkillBudget = 12;
-
-  // integrate hindrance purchases
-  const attrBudget = baseAttrBudget + (2 * h.spend.buyAttr);
-  const skillBudget = baseSkillBudget + (1 * h.spend.buySkill);
-
-  const a = computeAttributes(attrBudget);
-  const s = computeSkills(skillBudget);
-
-  const issues = [];
-  if(h.pts>4) issues.push(`Hindrances exceed 4 points (you have ${h.pts}).`);
-  if(h.spend.total>h.pts) issues.push(`Hindrance spending exceeds points earned (spent ${h.spend.total}, earned ${h.pts}).`);
-  if(!a.ok) issues.push(`Attributes overspent: ${a.spent}/${a.budget}.`);
-  if(!s.ok) issues.push(`Skills overspent: ${s.spent}/${s.budget}.`);
-
-  const statusEl = document.getElementById("status");
-  if(issues.length===0){
-    statusEl.textContent = "OK";
-    statusEl.className = "status ok";
-  }else{
-    statusEl.innerHTML = `<span class="bad">ILLEGAL</span><div class="muted" style="margin-top:6px">${issues.join(" ")}</div>`;
-    statusEl.className = "status bad";
-  }
-}
-
-/* ====== Import/Reset Hindrance List ====== */
-function parseHindImport(text){
-  const lines = (text||"").split("\n").map(l=>l.trim()).filter(Boolean);
-  const out = [];
-  for(const line of lines){
-    const parts = line.split("|").map(p=>p.trim());
-    if(parts.length < 2) continue;
-    const name = parts[0];
-    const type = parts[1];
-    const summary = parts[2] || "";
-    if(!name) continue;
-    out.push({name, type, summary});
-  }
-  // Basic sanitation: keep only known types
-  const okTypes = new Set(["Minor","Major","Minor/Major"]);
-  return out.filter(h => okTypes.has(h.type));
-}
-
-/* ====== Wiring ====== */
-function wire(){
-  document.getElementById("advances").addEventListener("input", computeAll);
-  document.addEventListener("change", (e)=>{
-    if(e.target.classList.contains("attrSel") ||
-       e.target.classList.contains("skillSel") ||
-       e.target.classList.contains("hindSel")){
-      computeAll();
+    function clampInt(v, lo, hi){
+      let n = parseInt(v||"0",10); if(Number.isNaN(n)) n=0;
+      return Math.max(lo, Math.min(hi, n));
     }
-  });
-  document.addEventListener("input", (e)=>{
-    if(["buyAttr","buySkill","buyEdge","buyFunds"].includes(e.target.id)){
-      computeAll();
-    }
-  });
 
-  document.getElementById("btnLoadHinds").addEventListener("click", ()=>{
-    const text = document.getElementById("hindImport").value;
-    const parsed = parseHindImport(text);
-    if(!parsed.length){
-      alert("No valid hindrances parsed. Use: Name | Minor/Major | optional summary");
-      return;
+    function hindSpend(){
+      const buyAttr  = clampInt(document.getElementById("buyAttr").value,0,99);
+      const buySkill = clampInt(document.getElementById("buySkill").value,0,99);
+      const buyEdge  = clampInt(document.getElementById("buyEdge").value,0,99);
+      const buyFunds = clampInt(document.getElementById("buyFunds").value,0,99);
+      const total = (2*buyAttr) + (1*buySkill) + (2*buyEdge) + (1*buyFunds);
+      return {buyAttr,buySkill,buyEdge,buyFunds,total};
     }
-    hindList = parsed;
-    saveHindList();
-    buildHindTable(hindList);
+
+    function getAttrDie(attr){
+      const sel = document.querySelector(`.attrSel[data-attr="${attr}"]`);
+      return sel ? sel.value : "d4";
+    }
+
+    /* ====== Hindrance list state ====== */
+    let hindList = [];
+
+    function forceStarterIfEmpty(){
+      if(!Array.isArray(hindList) || hindList.length===0){
+        hindList = STARTER_HINDRANCES.slice();
+      }
+    }
+
+    function loadHindList(){
+      hindList = [];
+      const raw = localStorage.getItem(LS_KEY_HINDS);
+      if(raw){
+        try{
+          const parsed = JSON.parse(raw);
+          if(Array.isArray(parsed) && parsed.length){
+            hindList = parsed;
+          }
+        }catch{
+          // ignore; will force starter
+        }
+      }
+      forceStarterIfEmpty();
+    }
+
+    function saveHindList(){
+      localStorage.setItem(LS_KEY_HINDS, JSON.stringify(hindList));
+    }
+
+    function hindByName(name){
+      return hindList.find(h=>h.name===name) || null;
+    }
+
+    function inferMinorMajorPoints(name){
+      const n = (name||"").toLowerCase();
+      if(n.includes("(major)")) return 2;
+      if(n.includes("(minor)")) return 1;
+      return 1;
+    }
+
+    /* ====== UI Builders ====== */
+    function buildAttrTable(){
+      const tb = document.querySelector("#attrTable tbody");
+      tb.innerHTML = "";
+      for(const a of ATTRS){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><b>${a}</b></td>
+          <td>
+            <select class="attrSel" data-attr="${a}">
+              ${DICE.map(d=>`<option value="${d}">${d}</option>`).join("")}
+            </select>
+          </td>
+          <td class="mono" id="attrCost_${a}">0</td>
+        `;
+        tb.appendChild(tr);
+        tr.querySelector("select").value = "d4";
+      }
+    }
+
+    function buildSkillTable(){
+      const tb = document.querySelector("#skillTable tbody");
+      tb.innerHTML = "";
+      for(const s of SKILLS){
+        const tr = document.createElement("tr");
+        const opts = [`<option value=""></option>`].concat(DICE.map(d=>`<option value="${d}">${d}</option>`)).join("");
+        tr.innerHTML = `
+          <td>${s.core ? "◇ " : ""}${s.name}</td>
+          <td class="mono">${s.linked}</td>
+          <td><select class="skillSel" data-skill="${s.name}">${opts}</select></td>
+          <td class="mono" id="skillCost_${s.name}">0</td>
+          <td class="muted">${s.core ? "Core: starts at d4 free" : ""}</td>
+        `;
+        tb.appendChild(tr);
+        tr.querySelector("select").value = s.core ? "d4" : "";
+      }
+    }
+
+    function buildHindTable(){
+      const tb = document.querySelector("#hindTable tbody");
+      tb.innerHTML = "";
+      for(let i=0;i<3;i++){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>
+            <select class="hindSel" data-hrow="${i}">
+              <option value=""></option>
+              ${hindList.map(h=>`<option value="${h.name}">${h.name}</option>`).join("")}
+            </select>
+          </td>
+          <td class="mono" id="hindType_${i}">—</td>
+          <td id="hindSum_${i}">—</td>
+          <td class="mono" id="hindPts_${i}">0</td>
+        `;
+        tb.appendChild(tr);
+      }
+      document.getElementById("hindCount").textContent = String(hindList.length);
+    }
+
+    /* ====== Compute ====== */
+    function computeRank(){
+      const adv = parseInt(document.getElementById("advances").value || "0", 10) || 0;
+      document.getElementById("rank").textContent = rankFromAdv(adv);
+    }
+
+    function computeAttributes(attrBudget){
+      let spent = 0;
+      for(const a of ATTRS){
+        const die = getAttrDie(a);
+        const c = dieCostFromD4(die);
+        spent += c;
+        document.getElementById(`attrCost_${a}`).textContent = String(c);
+      }
+      document.getElementById("attrSpent").textContent = String(spent);
+      document.getElementById("attrBudget").textContent = String(attrBudget);
+      const ok = spent <= attrBudget;
+      const st = document.getElementById("attrStatus");
+      st.textContent = ok ? "OK" : "ILLEGAL";
+      st.className = "mono " + (ok ? "ok" : "bad");
+      return {spent,budget:attrBudget,ok};
+    }
+
+    function computeSkills(skillBudget){
+      let spent = 0;
+      for(const s of SKILLS){
+        const sel = document.querySelector(`.skillSel[data-skill="${s.name}"]`);
+        const skillDie = sel ? sel.value : "";
+        const linkedDie = getAttrDie(s.linked);
+        const cost = skillCost(skillDie, linkedDie, !!s.core);
+        spent += cost;
+        document.getElementById(`skillCost_${s.name}`).textContent = String(cost);
+      }
+      document.getElementById("skillSpent").textContent = String(spent);
+      document.getElementById("skillBudget").textContent = String(skillBudget);
+      const ok = spent <= skillBudget;
+      const st = document.getElementById("skillStatus");
+      st.textContent = ok ? "OK" : "ILLEGAL";
+      st.className = "mono " + (ok ? "ok" : "bad");
+      return {spent,budget:skillBudget,ok};
+    }
+
+    function computeHindrances(){
+      let pts = 0;
+      for(let i=0;i<3;i++){
+        const sel = document.querySelector(`.hindSel[data-hrow="${i}"]`);
+        const name = sel ? sel.value : "";
+        const def = name ? hindByName(name) : null;
+
+        const typeEl = document.getElementById(`hindType_${i}`);
+        const sumEl  = document.getElementById(`hindSum_${i}`);
+        const ptsEl  = document.getElementById(`hindPts_${i}`);
+
+        if(!def){
+          typeEl.textContent = "—";
+          sumEl.textContent  = "—";
+          ptsEl.textContent  = "0";
+          continue;
+        }
+        typeEl.textContent = def.type || "—";
+        sumEl.textContent  = def.summary || "";
+        let p = 0;
+        if(def.type==="Minor") p = 1;
+        else if(def.type==="Major") p = 2;
+        else if(def.type==="Minor/Major") p = inferMinorMajorPoints(def.name);
+        ptsEl.textContent = String(p);
+        pts += p;
+      }
+
+      document.getElementById("hindPts").textContent = String(pts);
+
+      const spend = hindSpend();
+      document.getElementById("hindSpent").textContent = String(spend.total);
+      document.getElementById("hindRemain").textContent = String(pts - spend.total);
+
+      let ok = true;
+      if(pts > 4) ok = false;
+      if(spend.total > pts) ok = false;
+
+      const hs = document.getElementById("hindStatus");
+      hs.textContent = ok ? "OK" : "ILLEGAL";
+      hs.className = "mono " + (ok ? "ok" : "bad");
+
+      return {pts, ok, spend};
+    }
+
+    function computeAll(){
+      computeRank();
+      const h = computeHindrances();
+
+      const attrBudget = 5 + (2 * h.spend.buyAttr);
+      const skillBudget = 12 + (1 * h.spend.buySkill);
+
+      const a = computeAttributes(attrBudget);
+      const s = computeSkills(skillBudget);
+
+      const issues = [];
+      if(h.pts>4) issues.push(`Hindrances exceed 4 points (you have ${h.pts}).`);
+      if(h.spend.total>h.pts) issues.push(`Hindrance spending exceeds points earned (spent ${h.spend.total}, earned ${h.pts}).`);
+      if(!a.ok) issues.push(`Attributes overspent: ${a.spent}/${a.budget}.`);
+      if(!s.ok) issues.push(`Skills overspent: ${s.spent}/${s.budget}.`);
+
+      const statusEl = document.getElementById("status");
+      if(issues.length===0){
+        statusEl.textContent = "OK";
+        statusEl.className = "status ok";
+      }else{
+        statusEl.innerHTML = `<span class="bad">ILLEGAL</span><div class="muted" style="margin-top:6px">${issues.join(" ")}</div>`;
+        statusEl.className = "status bad";
+      }
+    }
+
+    function parseHindImport(text){
+      const lines = (text||"").split("\n").map(l=>l.trim()).filter(Boolean);
+      const out = [];
+      for(const line of lines){
+        const parts = line.split("|").map(p=>p.trim());
+        if(parts.length < 2) continue;
+        const name = parts[0];
+        const type = parts[1];
+        const summary = parts[2] || "";
+        if(!name) continue;
+        out.push({name, type, summary});
+      }
+      const okTypes = new Set(["Minor","Major","Minor/Major"]);
+      return out.filter(h => okTypes.has(h.type));
+    }
+
+    function wire(){
+      document.getElementById("advances").addEventListener("input", computeAll);
+
+      document.addEventListener("change", (e)=>{
+        if(e.target.classList.contains("attrSel") ||
+           e.target.classList.contains("skillSel") ||
+           e.target.classList.contains("hindSel")){
+          computeAll();
+        }
+      });
+
+      document.addEventListener("input", (e)=>{
+        if(["buyAttr","buySkill","buyEdge","buyFunds"].includes(e.target.id)){
+          computeAll();
+        }
+      });
+
+      document.getElementById("btnLoadHinds").addEventListener("click", ()=>{
+        const parsed = parseHindImport(document.getElementById("hindImport").value);
+        if(!parsed.length){
+          alert("No valid hindrances parsed. Use: Name | Minor/Major | optional summary");
+          return;
+        }
+        hindList = parsed;
+        saveHindList();
+        buildHindTable();
+        computeAll();
+        alert(`Loaded ${hindList.length} hindrances into dropdowns.`);
+      });
+
+      document.getElementById("btnResetHinds").addEventListener("click", ()=>{
+        hindList = STARTER_HINDRANCES.slice();
+        saveHindList();
+        buildHindTable();
+        computeAll();
+        alert("Reset to starter hindrance list.");
+      });
+    }
+
+    /* init */
+    loadHindList();
+    buildAttrTable();
+    buildSkillTable();
+    buildHindTable();
+    wire();
     computeAll();
-    alert(`Loaded ${hindList.length} hindrances into dropdowns.`);
-  });
 
-  document.getElementById("btnResetHinds").addEventListener("click", ()=>{
-    hindList = STARTER_HINDRANCES.slice();
-    saveHindList();
-    buildHindTable(hindList);
-    computeAll();
-    alert("Reset to starter hindrance list.");
-  });
-}
-
-/* ====== init ====== */
-loadHindList();
-buildAttrTable();
-buildSkillTable();
-buildHindTable(hindList);
-wire();
-computeAll();
+  } catch (err) {
+    const box = document.getElementById("runtimeError");
+    box.style.display = "block";
+    box.textContent = "Runtime error: " + (err && err.message ? err.message : String(err));
+    console.error(err);
+  }
+})();
 </script>
 </body>
 </html>
