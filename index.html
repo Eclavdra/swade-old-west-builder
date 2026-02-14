@@ -5,23 +5,33 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>SWADE — Old West — Character Builder</title>
 <style>
-body{font-family:Georgia,serif;margin:0;background:#f4f4f4}
-.container{max-width:1100px;margin:20px auto;background:#fff;padding:20px;border:1px solid #ccc}
-h1{margin-top:0}
-section{margin-bottom:20px;padding:10px;border:1px solid #ccc}
-label{display:block;font-size:13px;margin-top:6px}
-input,select,textarea{width:100%;padding:6px;margin-top:2px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{border:1px solid #ccc;padding:6px}
-.small{width:100px}
-.status{padding:10px;font-weight:bold}
-.ok{color:green}
-.bad{color:red}
-@media print{
-  button{display:none}
-  body{background:#fff}
-  .container{border:none}
-}
+  body{font-family:Georgia,serif;margin:0;background:#f4f4f4;color:#111}
+  .container{max-width:1200px;margin:20px auto;background:#fff;padding:18px;border:1px solid #ccc}
+  h1{margin:0 0 10px}
+  section{margin:14px 0;padding:12px;border:1px solid #ccc}
+  h2{margin:0 0 10px;font-size:16px}
+  label{display:block;font-size:13px;margin-top:8px}
+  input,select,textarea{width:100%;padding:6px;margin-top:2px;box-sizing:border-box}
+  .row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{border:1px solid #ccc;padding:6px;vertical-align:top}
+  th{background:#fafafa;text-align:left}
+  .pill{display:inline-block;border:1px solid #bbb;background:#fafafa;border-radius:999px;padding:3px 10px;font-size:12px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace}
+  .status{padding:10px;font-weight:bold}
+  .ok{color:#0b6}
+  .bad{color:#b00020}
+  .muted{color:#555}
+  .kpis{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  button{appearance:none;border:1px solid #999;background:#fff;padding:8px 10px;border-radius:8px;font-family:inherit;font-size:12px;cursor:pointer}
+  button:hover{background:#f7f7f7}
+  @media print{
+    button{display:none}
+    body{background:#fff}
+    .container{border:none;margin:0;max-width:none}
+    section{break-inside:avoid}
+  }
 </style>
 </head>
 <body>
@@ -30,96 +40,286 @@ th,td{border:1px solid #ccc;padding:6px}
 <h1>SWADE — Old West Character Builder</h1>
 
 <section>
-<h2>Character</h2>
-<label>Name <input id="name"></label>
-<label>Concept <input id="concept"></label>
-<label>Race
-<select id="race">
-<option value="Human">Human (Adaptable: 1 free Novice Edge)</option>
-</select>
-</label>
-<label>Advances <input type="number" id="advances" value="0" min="0"></label>
-<p>Rank: <span id="rank">Novice</span></p>
+  <h2>Character</h2>
+  <div class="row">
+    <div><label>Name <input id="name"></label></div>
+    <div><label>Concept <input id="concept"></label></div>
+    <div>
+      <label>Race
+        <select id="race">
+          <option value="Human">Human (Adaptable: 1 free Novice Edge)</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="row2">
+    <div>
+      <label>Advances <input type="number" id="advances" value="0" min="0"></label>
+      <div class="kpis">
+        <span class="pill">Rank: <span id="rank" class="mono">Novice</span></span>
+      </div>
+    </div>
+    <div class="muted" style="font-size:13px;line-height:1.35">
+      Stage A adds budget math for Attributes and Skills.<br/>
+      Hindrances/Edges will be upgraded in later steps.
+    </div>
+  </div>
 </section>
 
 <section>
-<h2>Attributes</h2>
-<table>
-<tr><th>Attribute</th><th>Die</th></tr>
-<tr><td>Agility</td><td><select class="attr"><option>d4</option><option>d6</option><option>d8</option><option>d10</option><option>d12</option></select></td></tr>
-<tr><td>Smarts</td><td><select class="attr"><option>d4</option><option>d6</option><option>d8</option><option>d10</option><option>d12</option></select></td></tr>
-<tr><td>Spirit</td><td><select class="attr"><option>d4</option><option>d6</option><option>d8</option><option>d10</option><option>d12</option></select></td></tr>
-<tr><td>Strength</td><td><select class="attr"><option>d4</option><option>d6</option><option>d8</option><option>d10</option><option>d12</option></select></td></tr>
-<tr><td>Vigor</td><td><select class="attr"><option>d4</option><option>d6</option><option>d8</option><option>d10</option><option>d12</option></select></td></tr>
-</table>
+  <h2>Attributes (Base budget: 5 points)</h2>
+  <table id="attrTable">
+    <thead><tr><th>Attribute</th><th style="width:140px;">Die</th><th style="width:160px;">Cost from d4</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div class="kpis">
+    <span class="pill">Attribute Spent: <span id="attrSpent" class="mono">0</span> / <span id="attrBudget" class="mono">5</span></span>
+    <span class="pill">Status: <span id="attrStatus" class="mono ok">OK</span></span>
+  </div>
 </section>
 
 <section>
-<h2>Hindrances</h2>
-<table>
-<tr><th>Name</th><th>Severity</th></tr>
-<tr>
-<td>
-<select class="hind">
-<option value="">--</option>
-<option value="Minor">Minor Hindrance</option>
-<option value="Major">Major Hindrance</option>
-</select>
-</td>
-<td>
-<select class="sev">
-<option value="1">Minor (1)</option>
-<option value="2">Major (2)</option>
-</select>
-</td>
-</tr>
-</table>
-<p>Hindrance Points: <span id="hindPoints">0</span>/4</p>
+  <h2>Skills (Base budget: 12 points)</h2>
+  <div class="muted" style="font-size:13px;line-height:1.35;margin-bottom:8px">
+    Old West house rule: <b>Common Knowledge removed</b>. Core skills that start at <b>d4 for free</b> are:
+    <b>Athletics, Notice, Persuasion, Stealth, Riding</b>.
+  </div>
+  <table id="skillTable">
+    <thead>
+      <tr>
+        <th>Skill</th>
+        <th style="width:120px;">Linked</th>
+        <th style="width:140px;">Die</th>
+        <th style="width:140px;">Cost</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div class="kpis">
+    <span class="pill">Skill Spent: <span id="skillSpent" class="mono">0</span> / <span id="skillBudget" class="mono">12</span></span>
+    <span class="pill">Status: <span id="skillStatus" class="mono ok">OK</span></span>
+  </div>
 </section>
 
 <section>
-<h2>Edges</h2>
-<table>
-<tr><th>Source</th><th>Name</th></tr>
-<tr>
-<td>Race</td>
-<td><input placeholder="Free Novice Edge"></td>
-</tr>
-<tr>
-<td>Hindrance</td>
-<td><input></td>
-</tr>
-<tr>
-<td>Advance</td>
-<td><input></td>
-</tr>
-</table>
-</section>
-
-<section>
-<h2>Status</h2>
-<div id="status" class="status ok">OK</div>
-<button onclick="window.print()">Print</button>
+  <h2>Status</h2>
+  <div id="status" class="status ok">OK</div>
+  <button onclick="window.print()">Print</button>
 </section>
 
 </div>
 
 <script>
-const advInput=document.getElementById("advances");
-const rankSpan=document.getElementById("rank");
+/* ====== Dice + costs ====== */
+const DICE = ["d4","d6","d8","d10","d12"];
+const DICE_IDX = {"d4":0,"d6":1,"d8":2,"d10":3,"d12":4};
+const DIE_FROM_IDX = ["d4","d6","d8","d10","d12"];
 
-function updateRank(){
-let adv=parseInt(advInput.value)||0;
-let rank="Novice";
-if(adv>=4)rank="Seasoned";
-if(adv>=8)rank="Veteran";
-if(adv>=12)rank="Heroic";
-if(adv>=16)rank="Legendary";
-rankSpan.textContent=rank;
+function dieCostFromD4(d){ return DICE_IDX[d] ?? 0; } // d4=0,d6=1,d8=2,d10=3,d12=4
+
+/* ====== Attributes ====== */
+const ATTRS = ["Agility","Smarts","Spirit","Strength","Vigor"];
+
+/* ====== Skills ======
+   Full SWADE-ish core list, minus Common Knowledge.
+   (If you later want a stricter Old West list, we can prune.)
+*/
+const SKILLS = [
+  {name:"Academics", linked:"Smarts"},
+  {name:"Athletics", linked:"Agility", core:true},
+  {name:"Battle", linked:"Smarts"},
+  {name:"Boating", linked:"Agility"},
+  {name:"Driving", linked:"Agility"},
+  {name:"Faith", linked:"Spirit"},
+  {name:"Fighting", linked:"Agility"},
+  {name:"Gambling", linked:"Smarts"},
+  {name:"Healing", linked:"Smarts"},
+  {name:"Intimidation", linked:"Spirit"},
+  {name:"Language", linked:"Smarts"},
+  {name:"Notice", linked:"Smarts", core:true},
+  {name:"Occult", linked:"Smarts"},
+  {name:"Performance", linked:"Spirit"},
+  {name:"Persuasion", linked:"Spirit", core:true},
+  {name:"Repair", linked:"Smarts"},
+  {name:"Research", linked:"Smarts"},
+  {name:"Riding", linked:"Agility", core:true},
+  {name:"Science", linked:"Smarts"},
+  {name:"Shooting", linked:"Agility"},
+  {name:"Stealth", linked:"Agility", core:true},
+  {name:"Survival", linked:"Smarts"},
+  {name:"Taunt", linked:"Smarts"},
+  {name:"Thievery", linked:"Agility"}
+];
+
+function rankFromAdv(adv){
+  if(adv>=16) return "Legendary";
+  if(adv>=12) return "Heroic";
+  if(adv>=8) return "Veteran";
+  if(adv>=4) return "Seasoned";
+  return "Novice";
 }
-advInput.addEventListener("input",updateRank);
-updateRank();
-</script>
 
+/* Skill cost rule:
+   - Core skills begin at d4 for free.
+   - Non-core skills begin untrained (blank) for free; d4 is the first paid step.
+   - Raising a skill up to and including its linked attribute costs 1 point per die step.
+   - Raising above the linked attribute costs 2 points per die step above.
+*/
+function skillCost(skillDie, linkedDie, isCore){
+  if(!skillDie) return 0;
+
+  const sIdx = DICE_IDX[skillDie];
+  const lIdx = DICE_IDX[linkedDie] ?? 0;
+
+  // base index from which you start paying
+  const basePaidIdx = isCore ? 0 : -1; // core pays from d4 (idx 0) but d4 is free; non-core pays from "untrained" (-1)
+
+  let cost = 0;
+  // iterate steps from basePaidIdx+1 to sIdx
+  for(let idx = basePaidIdx + 1; idx <= sIdx; idx++){
+    // core at d4 is free
+    if(isCore && idx===0) continue;
+    // cost depends on whether this step is above linked
+    cost += (idx <= lIdx) ? 1 : 2;
+  }
+  return cost;
+}
+
+/* ====== Build UI ====== */
+function buildAttrTable(){
+  const tb = document.querySelector("#attrTable tbody");
+  tb.innerHTML = "";
+  for(const a of ATTRS){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><b>${a}</b></td>
+      <td>
+        <select class="attrSel" data-attr="${a}">
+          ${DICE.map(d=>`<option value="${d}">${d}</option>`).join("")}
+        </select>
+      </td>
+      <td class="mono" id="attrCost_${a}">0</td>
+    `;
+    tb.appendChild(tr);
+    tr.querySelector("select").value = "d4";
+  }
+}
+
+function buildSkillTable(){
+  const tb = document.querySelector("#skillTable tbody");
+  tb.innerHTML = "";
+  for(const s of SKILLS){
+    const tr = document.createElement("tr");
+    const opts = [`<option value=""></option>`].concat(DICE.map(d=>`<option value="${d}">${d}</option>`)).join("");
+    tr.innerHTML = `
+      <td>${s.core ? "◇ " : ""}${s.name}</td>
+      <td class="mono">${s.linked}</td>
+      <td>
+        <select class="skillSel" data-skill="${s.name}">
+          ${opts}
+        </select>
+      </td>
+      <td class="mono" id="skillCost_${s.name}">0</td>
+      <td class="muted">${s.core ? "Core: starts at d4 free" : ""}</td>
+    `;
+    tb.appendChild(tr);
+
+    // defaults
+    const sel = tr.querySelector("select");
+    sel.value = s.core ? "d4" : "";
+  }
+}
+
+/* ====== Compute ====== */
+function getAttrDie(attr){
+  const sel = document.querySelector(`.attrSel[data-attr="${attr}"]`);
+  return sel ? sel.value : "d4";
+}
+
+function computeAttributes(){
+  let spent = 0;
+  for(const a of ATTRS){
+    const die = getAttrDie(a);
+    const c = dieCostFromD4(die);
+    spent += c;
+    const cell = document.getElementById(`attrCost_${a}`);
+    if(cell) cell.textContent = String(c);
+  }
+  const budget = 5;
+  document.getElementById("attrSpent").textContent = String(spent);
+  document.getElementById("attrBudget").textContent = String(budget);
+
+  const ok = spent <= budget;
+  document.getElementById("attrStatus").textContent = ok ? "OK" : "ILLEGAL";
+  document.getElementById("attrStatus").className = "mono " + (ok ? "ok" : "bad");
+  return {spent, budget, ok};
+}
+
+function computeSkills(){
+  let spent = 0;
+
+  for(const s of SKILLS){
+    const sel = document.querySelector(`.skillSel[data-skill="${s.name}"]`);
+    const skillDie = sel ? sel.value : "";
+    const linkedDie = getAttrDie(s.linked);
+    const cost = skillCost(skillDie, linkedDie, !!s.core);
+    spent += cost;
+
+    const cell = document.getElementById(`skillCost_${s.name}`);
+    if(cell) cell.textContent = String(cost);
+  }
+
+  const budget = 12;
+  document.getElementById("skillSpent").textContent = String(spent);
+  document.getElementById("skillBudget").textContent = String(budget);
+
+  const ok = spent <= budget;
+  document.getElementById("skillStatus").textContent = ok ? "OK" : "ILLEGAL";
+  document.getElementById("skillStatus").className = "mono " + (ok ? "ok" : "bad");
+  return {spent, budget, ok};
+}
+
+function computeRank(){
+  const adv = parseInt(document.getElementById("advances").value || "0", 10) || 0;
+  document.getElementById("rank").textContent = rankFromAdv(adv);
+}
+
+function computeAll(){
+  computeRank();
+  const a = computeAttributes();
+  const s = computeSkills();
+
+  const issues = [];
+  if(!a.ok) issues.push(`Attributes overspent: ${a.spent}/${a.budget}.`);
+  if(!s.ok) issues.push(`Skills overspent: ${s.spent}/${s.budget}.`);
+
+  const statusEl = document.getElementById("status");
+  if(issues.length===0){
+    statusEl.textContent = "OK";
+    statusEl.className = "status ok";
+  }else{
+    statusEl.innerHTML = `<span class="bad">ILLEGAL</span><div class="muted" style="margin-top:6px">${issues.join(" ")}</div>`;
+    statusEl.className = "status bad";
+  }
+}
+
+function wire(){
+  document.getElementById("advances").addEventListener("input", computeAll);
+
+  document.addEventListener("change", (e)=>{
+    if(e.target.classList.contains("attrSel") || e.target.classList.contains("skillSel")){
+      computeAll();
+    }
+  });
+}
+
+/* ====== init ====== */
+buildAttrTable();
+buildSkillTable();
+wire();
+computeAll();
+</script>
 </body>
 </html>
